@@ -4,6 +4,10 @@
 
 int used_mem = 0;
 
+int get_used_mem(){
+    return used_mem;
+}
+
 db_scheme * create_new_scheme(){
     db_scheme * new_db_scheme = (db_scheme *) malloc(sizeof(db_scheme));
     used_mem += sizeof(db_scheme);
@@ -47,8 +51,9 @@ scheme_node * search_node_by_type_name(db_scheme * scheme, char * type_name, int
 }
 
 scheme_node * add_node_to_scheme(db_scheme * scheme, char * type_name){
-    scheme_node * new_node = (scheme_node *) malloc(sizeof(scheme_node));
+    scheme_node * new_node;
     if (scheme -> first_node == NULL || scheme -> last_node == NULL ) {
+        scheme_node * new_node = (scheme_node *) malloc(sizeof(scheme_node));
         used_mem += sizeof(scheme_node);
         scheme->first_node = new_node;
         scheme->last_node = new_node;
@@ -57,6 +62,7 @@ scheme_node * add_node_to_scheme(db_scheme * scheme, char * type_name){
         int n;
         if (search_node_by_type_name(scheme, type_name, &n)) // if exists
             return NULL;
+        scheme_node * new_node = (scheme_node *) malloc(sizeof(scheme_node));
         used_mem += sizeof(scheme_node);
         scheme->last_node->next_node = new_node;
         scheme->last_node = new_node;
@@ -69,4 +75,45 @@ scheme_node * add_node_to_scheme(db_scheme * scheme, char * type_name){
     new_node->next_node = NULL;
 
     return new_node;
+}
+
+attr * search_attr_by_name(scheme_node * node, char * name, int * n){
+    attr * current_attr = node->first_attr;
+    *n = 0;
+    while(current_attr != NULL) {
+        if (strcmp(name, current_attr->name_attr) == 0)
+            return current_attr;
+        else {
+            current_attr = current_attr->next;
+            (*n)++;
+        }
+    }
+    (*n)--;
+    return NULL;
+}
+
+attr * add_attr_to_node(scheme_node * node, char * name, char type) {
+    attr * new_attr;
+    if (node->first_attr == NULL || node->last_attr == NULL){
+        new_attr = (attr *) malloc(sizeof(attr));
+        used_mem += sizeof(attr);
+        node->first_attr = new_attr;
+        node->last_attr = new_attr;
+    } else {
+        int n;
+        if (search_attr_by_name(node, name, &n)){
+            return NULL;
+        }
+        new_attr = (attr *) malloc(sizeof(attr));
+        used_mem += sizeof(attr);
+        node->last_attr->next = new_attr;
+        node->last_attr = new_attr;
+    }
+    new_attr->name_attr = (char *) malloc(1 + strlen(name) * sizeof(char));
+    used_mem += 1 + strlen(name) * sizeof(char);
+    strcpy(new_attr->name_attr, name);
+    new_attr->type_attr = type;
+    new_attr->next = NULL;
+
+    return new_attr;
 }
