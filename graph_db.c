@@ -1,3 +1,16 @@
+/*
+    TO-DO
+    1. add node to db
+    2. add attr of node to db
+    3. write node data to db
+    4. read node data from db
+    5. load db from file
+    6. query select with simple compare
+    7. query select with AND condition
+    8. query delete
+    9. test delete correctly
+    10. test free memory correctly
+*/
 #include "headers/graph_db.h"
 #include <stdlib.h>
 #include <string.h>
