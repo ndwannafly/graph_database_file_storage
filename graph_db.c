@@ -1,6 +1,7 @@
 #include "headers/graph_db.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 int used_mem = 0;
 
@@ -53,7 +54,7 @@ scheme_node * search_node_by_type_name(db_scheme * scheme, char * type_name, int
 scheme_node * add_node_to_scheme(db_scheme * scheme, char * type_name){
     scheme_node * new_node;
     if (scheme -> first_node == NULL || scheme -> last_node == NULL ) {
-        scheme_node * new_node = (scheme_node *) malloc(sizeof(scheme_node));
+        new_node = (scheme_node *) malloc(sizeof(scheme_node));
         used_mem += sizeof(scheme_node);
         scheme->first_node = new_node;
         scheme->last_node = new_node;
@@ -62,7 +63,7 @@ scheme_node * add_node_to_scheme(db_scheme * scheme, char * type_name){
         int n;
         if (search_node_by_type_name(scheme, type_name, &n)) // if exists
             return NULL;
-        scheme_node * new_node = (scheme_node *) malloc(sizeof(scheme_node));
+        new_node = (scheme_node *) malloc(sizeof(scheme_node));
         used_mem += sizeof(scheme_node);
         scheme->last_node->next_node = new_node;
         scheme->last_node = new_node;
@@ -70,6 +71,8 @@ scheme_node * add_node_to_scheme(db_scheme * scheme, char * type_name){
     new_node->type = (char *) malloc(1+strlen(type_name)*sizeof(char));
     used_mem += 1 + strlen(type_name) * sizeof(char);
     strcpy(new_node->type, type_name);
+    new_node->first_node_relation = NULL;
+    new_node->last_node_relation = NULL;
     new_node->last_attr = NULL;
     new_node->first_attr = NULL;
     new_node->next_node = NULL;
@@ -88,7 +91,7 @@ attr * search_attr_by_name(scheme_node * node, char * name, int * n){
             (*n)++;
         }
     }
-    (*n)--;
+    *n -= 1;
     return NULL;
 }
 
@@ -116,4 +119,41 @@ attr * add_attr_to_node(scheme_node * node, char * name, char type) {
     new_attr->next = NULL;
 
     return new_attr;
+}
+
+node_relation * search_node_relation_by_nodes (scheme_node * node, scheme_node * next_related_node){
+    node_relation * current_node_relation = node->first_node_relation;
+    while(current_node_relation != NULL) {
+        if (next_related_node == current_node_relation->node)
+            return current_node_relation;
+        else
+            current_node_relation = current_node_relation->next_node_relation;
+    }
+    return NULL;
+}
+
+node_relation * add_node_relation(scheme_node * node, scheme_node * next_related_node){
+    node_relation * new_node_relation;
+
+    if (search_node_relation_by_nodes(node, next_related_node))
+        return NULL;
+
+    new_node_relation = (node_relation *) malloc(sizeof(node_relation));
+    used_mem += sizeof(node_relation);
+    new_node_relation->node = next_related_node;
+    new_node_relation->next_node_relation = NULL;
+
+    if (node->first_node_relation == NULL || node->last_node_relation == NULL) {
+        node->first_node_relation = new_node_relation;
+        node->last_node_relation = new_node_relation;
+    } else {
+        node->last_node_relation->next_node_relation = new_node_relation;
+        node->last_node_relation = new_node_relation;
+    }
+
+    return new_node_relation;
+}
+
+void shutdown_db(graph_db * db){
+    return;
 }
