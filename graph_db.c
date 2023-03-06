@@ -1,9 +1,9 @@
 /*
     TO-DO
-    1. add node to db
-    2. add attr of node to db
-    3. write node data to db
-    4. read node data from db
+    1. add node to db -> DONE
+    2. add attr of node to db -> DONE
+    3. write node data to file -> DOING
+    4. read node data from file
     5. load db from file
     6. query select with simple compare
     7. query select with AND condition
@@ -18,7 +18,8 @@
 
 int used_mem = 0;
 
-int BufferSize = 1024*32;
+int BUFFER_SIZE = 1024*32;
+int MAX_NODE_RELATIONS = 8;
 
 int get_used_mem(){
     return used_mem;
@@ -51,9 +52,18 @@ int db_ftell(graph_db *db){
     return ftell(db->file_storage);
 }
 
+void write_buffer (char * buffer, int * n_buffer, float what) {
+    char * w = (char *) &what;
+    int i;
+    buffer += *n_buffer;
+    for (i = 0; i < sizeof(float); i++, buffer++, (*n_buffer)++){
+        *buffer = w[i];
+    }
+}
+
 void db_fwrite(void * buf, int item_size, int n_items, graph_db * db){
     char * _buf = (char *) buf;
-    int n_free = BufferSize - db->n_write_buffer;
+    int n_free = BUFFER_SIZE - db->n_write_buffer;
     int n_bytes = item_size * n_items;
     int i = db->n_write_buffer;
     if (db->i_read_buffer < db->n_read_buffer){
@@ -69,8 +79,8 @@ void db_fwrite(void * buf, int item_size, int n_items, graph_db * db){
             db->write_buffer[i] = *_buf++;
         }
     }
-    if (db->n_write_buffer == BufferSize) {
-        fwrite(db->write_buffer, 1, BufferSize, db->file_storage);
+    if (db->n_write_buffer == BUFFER_SIZE) {
+        fwrite(db->write_buffer, 1, BUFFER_SIZE, db->file_storage);
         fwrite(_buf, 1, n_bytes, db->file_storage);
         db->n_write_buffer = 0;
     }
@@ -131,11 +141,11 @@ graph_db * create_new_graph_db_by_scheme(db_scheme *scheme, char *file_name){
     if (new_graph_db->file_storage) {
         int scheme_length;
         new_graph_db->scheme = scheme;
-        new_graph_db->write_buffer = (char *)malloc(BufferSize);
-        used_mem += BufferSize;
+        new_graph_db->write_buffer = (char *)malloc(BUFFER_SIZE);
+        used_mem += BUFFER_SIZE;
         new_graph_db->n_write_buffer = 0;
-        new_graph_db->read_buffer = (char *)malloc(BufferSize);
-        used_mem += BufferSize;
+        new_graph_db->read_buffer = (char *)malloc(BUFFER_SIZE);
+        used_mem += BUFFER_SIZE;
         new_graph_db->i_read_buffer = 0;
         new_graph_db->n_read_buffer = 0;
         db_fseek(new_graph_db, sizeof(int), SEEK_SET);
@@ -191,7 +201,9 @@ scheme_node * add_node_to_scheme(db_scheme * scheme, char * type_name){
     new_node->last_attr = NULL;
     new_node->first_attr = NULL;
     new_node->next_node = NULL;
-
+    new_node->buffer = (char *) malloc(BUFFER_SIZE*sizeof(char));
+    used_mem += BUFFER_SIZE * sizeof(char);
+    new_node->n_buffer = 0;
     return new_node;
 }
 
@@ -388,6 +400,36 @@ void del_attr_from_node(scheme_node * node, attr * to_delete_attr){
     }
 }
 
+void cancel_editing_node(scheme_node * node) {
+    node->n_buffer = 0;
+    node->added = 0;
+}
+
+void create_node_for_db(graph_db * db, scheme_node * node){
+    attr * cur_attr = node->first_attr;
+    int i;
+    cancel_editing_node(node);
+    node->n_buffer = 0;
+    node->added = 1;
+    while (cur_attr != NULL) {
+        write_buffer(node->buffer, &node->n_buffer, 0.0);
+        cur_attr = cur_attr->next;
+    }
+    write_buffer(node->buffer, &node->n_buffer, 0.0);
+
+    for (i=0; i < MAX_NODE_RELATIONS; i++) {
+        write_buffer(node->buffer, &node->n_buffer, 0.0);
+        write_buffer(node->buffer, &node->n_buffer, 0.0);
+    }
+}
+
+void set_value_for_attr_of_node(graph_db * db, scheme_node * node, char * attr_name, float value){
+    int n;
+    if (node->n_buffer > 0 && search_attr_by_name(node, attr_name, &n)){
+        n *= sizeof(float);
+        write_buffer(node->buffer, &n, value);
+    }
+}
 
 void shutdown_db(graph_db * db){
     return;

@@ -24,6 +24,9 @@ typedef struct scheme_node{
     int root_off_set;
     int first_off_set;
     int last_off_set;
+    int added;
+    int n_buffer;
+    char * buffer;
 } scheme_node;
 
 typedef struct attr {
@@ -67,11 +70,12 @@ node_relation * search_node_relation_by_nodes (scheme_node * node, scheme_node *
 void del_node_relation(scheme_node * node, scheme_node * to_delete_node);
 void del_node_from_scheme(db_scheme * scheme, scheme_node * node);
 void del_attr_from_node(scheme_node * node, attr * to_delete_attr);
-
 void free_node_from_scheme(scheme_node * node);
-
 void store_attrs(graph_db * db, attr * attributes);
-
 void store_relations(graph_db * db, node_relation * relations);
 
+void cancel_editing_node(scheme_node * node);
+void create_node_for_db(graph_db * db, scheme_node * node);
+
+void set_value_for_attr_of_node(graph_db * db, scheme_node * node, char * attr_name, float value);
 #endif

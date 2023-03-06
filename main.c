@@ -1,7 +1,9 @@
 #include "headers/graph_db.h"
+#include "headers/data_helper.h"
 #include <stdio.h>
 
 int main(){
+    char * city_name[5] = {"Moscow", "Saint Petersburg", "Murmansk", "Vyborg", "Makhachkala"};
 
     graph_db * db;
     db_scheme * scheme;
@@ -39,12 +41,18 @@ int main(){
     // DELETE ATTR FROM NODE
     int i;
     del_attr_from_node(country_node, search_attr_by_name(country_node, "to_be_deleted", &i));
-
     db = create_new_graph_db_by_scheme(scheme, "storage.txt");
+
+    for (i = 0; i < 10; i++){
+        if (i%2 == 0){
+            create_node_for_db(db, city_node);
+            set_value_for_attr_of_node(db, city_node, "name", create_string_for_db(db, city_name[i/2]));
+        }
+        create_node_for_db(db, country_node);
+    }
 
     // get used_mem
     printf("%d\n", get_used_mem());
-
 
     return 0;
 }
