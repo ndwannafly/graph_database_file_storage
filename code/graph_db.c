@@ -2,8 +2,8 @@
     TO-DO
     1. add node to db -> DONE
     2. add attr of node to db -> DONE
-    3. write node data to file -> DOING
-    4. read node data from file
+    3. write node data to file -> DONE
+    4. read node data from file -> DONE
     5. load db from file
     6. query select with simple compare
     7. query select with AND condition
@@ -11,7 +11,8 @@
     9. test delete correctly
     10. test free memory correctly
 */
-#include "headers/graph_db.h"
+#include "../headers/graph_db.h"
+#include "../headers/data_helper.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -61,6 +62,19 @@ void write_buffer (char * buffer, int * n_buffer, float what) {
     }
 }
 
+void db_fread(void * buf, int item_size, int n_items, graph_db * db) {
+    char * _buf = (char *) buf;
+    int n_have = db->n_read_buffer - db ->i_read_buffer;
+    int n_bytes = item_size * n_items;
+    for (; n_bytes > 0 && n_have > 0; n_have--, n_bytes--){
+        *_buf++ = db->read_buffer[db->i_read_buffer++];
+    }
+    if (n_bytes > 0){
+        fread(_buf, 1, n_bytes, db->file_storage);
+        db->i_read_buffer = 0;
+        db->n_read_buffer = fread(db->read_buffer, 1, BUFFER_SIZE, db->file_storage);
+    }
+}
 void db_fwrite(void * buf, int item_size, int n_items, graph_db * db){
     char * _buf = (char *) buf;
     int n_free = BUFFER_SIZE - db->n_write_buffer;
@@ -428,6 +442,91 @@ void set_value_for_attr_of_node(graph_db * db, scheme_node * node, char * attr_n
     if (node->n_buffer > 0 && search_attr_by_name(node, attr_name, &n)){
         n *= sizeof(float);
         write_buffer(node->buffer, &n, value);
+    }
+}
+void post_node_to_db(graph_db * db, scheme_node * node){
+    if (node -> n_buffer > 0) {
+        if (node->added) {
+            int n = sizeof(int) + sizeof(unsigned char) + sizeof(int) + node->n_buffer;
+            unsigned char type = R_NODE;
+            int empty_offset = 0;
+            db_fseek(db, 0, SEEK_END);
+            node->this_offset = db_ftell(db);
+            db_fwrite(&n, sizeof(n), 1, db);
+            db_fwrite(&type, sizeof(type), 1, db);
+            db_fwrite(&empty_offset, sizeof(empty_offset), 1, db);
+            db_fwrite(node->buffer, node->n_buffer, 1, db);
+            node->prev_offset = node->last_off_set;
+            if (node->first_off_set == 0 && node->last_off_set == 0) {
+                db_fseek(db, node->root_off_set, SEEK_SET);
+                db_fwrite(&node->this_offset, sizeof(int), 1, db);
+                db_fwrite(&node->this_offset, sizeof(int), 1, db);
+                node->first_off_set = node->this_offset;
+                node->last_off_set = node->this_offset;
+            } else {
+                db_fseek(db, node->prev_offset = sizeof(int) + sizeof(unsigned char), SEEK_SET);
+                db_fwrite(&node->this_offset, sizeof(int), 1, db);
+                db_fseek(db, node->root_off_set + sizeof(int), SEEK_SET);
+                db_fwrite(&node->this_offset, sizeof(int), 1, db);
+                node->last_off_set = node -> this_offset;
+            }
+            node->added = 0;
+        } else {
+            db_fseek(db, node->this_offset + sizeof(int) + sizeof(unsigned char) + sizeof(int), SEEK_SET);
+            db_fwrite(node->buffer, node->n_buffer, 1, db);
+        }
+        db_fflush(db);
+    }
+}
+
+void open_node_to_db(graph_db * db, scheme_node * node){
+    unsigned char type;
+    int dummy;
+    int n;
+    cancel_editing_node(node);
+    if (node->this_offset == 0) return 0;
+    node->n_buffer = 0;
+    node->added = 0;
+    db_fseek(db, node->this_offset, SEEK_SET);
+    db_fread(&n, sizeof(n), 1 ,db);
+    db_fread(&type, sizeof(type), 1 , db);
+    if (type != R_NODE) return 0;
+    db_fread(&dummy, sizeof(int), 1 ,db);
+    node->n_buffer = n - sizeof(n) - sizeof(type) - sizeof(int);
+    db_fread(node->buffer, node->n_buffer, 1 , db);
+    return 1;
+}
+
+int link_current_node_to_current_node(graph_db * db, scheme_node * from_node, scheme_node * to_node){
+    attr * list_attrs = from_node->first_attr;
+    node_relation * list_rel = from_node->first_node_relation;
+    float * buf;
+    int n, i;
+    int offset = 0;
+    while (list_rel != NULL && list_rel -> node != to_node) {
+        list_rel = list_rel->next_node_relation;
+    }
+    if (list_rel == NULL) return 0;
+
+    while (list_attrs != NULL) {
+        offset += sizeof(float);
+        list_attrs = list_attrs->next;
+    }
+
+    buf = (float *) (from_node->buffer + offset);
+    n = *buf;
+    for (i = 0; i < n; i++){
+        if (buf[2*i+1] == from_node->root_off_set && buf[2*i+2] == to_node->this_offset){
+            return 1;
+        }
+    }
+    if (n < MAX_NODE_RELATIONS){
+        (*buf)++;
+        buf[2*n+i] = to_node->root_off_set;
+        buf[2*n+i] = to_node->this_offset;
+        return 1;
+    } else {
+        return 0;
     }
 }
 

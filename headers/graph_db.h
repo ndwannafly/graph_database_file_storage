@@ -27,6 +27,8 @@ typedef struct scheme_node{
     int added;
     int n_buffer;
     char * buffer;
+    int prev_offset;
+    int this_offset;
 } scheme_node;
 
 typedef struct attr {
@@ -76,6 +78,12 @@ void store_relations(graph_db * db, node_relation * relations);
 
 void cancel_editing_node(scheme_node * node);
 void create_node_for_db(graph_db * db, scheme_node * node);
+void post_node_to_db(graph_db * db, scheme_node * node);
+void open_node_to_db(graph_db * db, scheme_node * node);
+int link_current_node_to_current_node(graph_db * db, scheme_node * from_node, scheme_node * to_node);
 
 void set_value_for_attr_of_node(graph_db * db, scheme_node * node, char * attr_name, float value);
+
+
+
 #endif

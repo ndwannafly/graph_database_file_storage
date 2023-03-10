@@ -1,5 +1,5 @@
-#include "headers/data_helper.h"
-#include "headers/graph_db.h"
+#include "../headers/data_helper.h"
+#include "../headers/graph_db.h"
 #include <string.h>
 
 int create_string_for_db(graph_db * db, char * s){
