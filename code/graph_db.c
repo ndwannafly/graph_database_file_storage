@@ -4,7 +4,7 @@
     2. add attr of node to db -> DONE
     3. write node data to file -> DONE
     4. read node data from file -> DONE
-    5. load db from file
+    5. load db from file -> DOing
     6. query select with simple compare
     7. query select with AND condition
     8. query delete
@@ -21,9 +21,13 @@ int used_mem = 0;
 
 int BUFFER_SIZE = 1024*32;
 int MAX_NODE_RELATIONS = 8;
-
+int relink_table_delta = 20;
 int get_used_mem(){
     return used_mem;
+}
+
+void register_free(int amount){
+    used_mem -= amount;
 }
 
 db_scheme * create_new_scheme(){
@@ -41,7 +45,16 @@ void free_up_db(graph_db * db){
 
 
 void db_fflush(graph_db * db){
-    fflush(db->file_storage);
+    if (db->i_read_buffer < db->n_read_buffer){
+        fseek(db->file_storage, db->i_read_buffer - db->n_read_buffer, SEEK_CUR);
+        db->i_read_buffer = 0;
+        db->n_read_buffer = 0;
+    }
+    if (db->n_write_buffer > 0){
+        fwrite(db->write_buffer, 1, db->n_write_buffer, db->file_storage);
+        fflush(db->file_storage);
+        db->n_write_buffer = 0;
+    }
 }
 
 void db_fseek(graph_db * db, int offset, int flag){
@@ -98,6 +111,20 @@ void db_fwrite(void * buf, int item_size, int n_items, graph_db * db){
         fwrite(_buf, 1, n_bytes, db->file_storage);
         db->n_write_buffer = 0;
     }
+}
+
+int create_string_for_db(graph_db * db, char * s){
+    unsigned char Type = R_STRING;
+    int length = strlen(s);
+    int n = sizeof(int) + sizeof(unsigned char) + 1 + length;
+    int result;
+    db_fseek(db, 0, SEEK_END);
+    result = db_ftell(db);
+    db_fwrite(&n, sizeof(n), 1, db);
+    db_fwrite(&Type, sizeof(Type), 1, db);
+    db_fwrite(s, length + 1, 1, db);
+    db_fflush(db);
+    return result;
 }
 
 void store_relations(graph_db * db, node_relation * relations) {
@@ -329,7 +356,16 @@ void del_node_relation(scheme_node * node, scheme_node * to_delete_node){
     }
 }
 
+void free_attr_from_scheme(attr * a){
+    used_mem -= 1 + strlen(a->name_attr);
+    free(a->name_attr);
+    used_mem -= sizeof(attr);
+    free(a);
+}
+
 void free_node_from_scheme(scheme_node * node) {
+    used_mem -= 1 + strlen(node->type);
+    free(node->type);
     node_relation * relation = node->first_node_relation;
     while(relation != NULL){
         node_relation * to_delete = relation;
@@ -337,28 +373,28 @@ void free_node_from_scheme(scheme_node * node) {
         free(to_delete);
         relation = relation->next_node_relation;
     }
-
     attr * cur_attr = node->first_attr;
     while(cur_attr != NULL) {
         attr * to_delete = cur_attr;
-        used_mem -= sizeof(attr);
-        free(to_delete);
+        free_attr_from_scheme(to_delete);
         cur_attr = cur_attr ->next;
     }
-
-    used_mem -= 1 + strlen(node->type);
-    free(node->type);
+    used_mem -= BUFFER_SIZE;
+    free(node->buffer);
 
     used_mem -= sizeof(scheme_node);
     free(node);
+
 }
 
 void del_node_from_scheme(db_scheme * scheme, scheme_node * node){
     if (scheme->first_node != NULL && scheme->last_node != NULL) {
         if (scheme->first_node == scheme->last_node){ // scheme has only one node
-            free_node_from_scheme(node);
-            scheme->first_node = NULL;
-            scheme->last_node = NULL;
+            if (scheme ->first_node == node){
+                free_node_from_scheme(node);
+                scheme->first_node = NULL;
+                scheme->last_node = NULL;
+            }
         } else if (scheme->first_node == node) {
             scheme->first_node = node->next_node;
             free_node_from_scheme(node);
@@ -383,11 +419,15 @@ void del_node_from_scheme(db_scheme * scheme, scheme_node * node){
 void del_attr_from_node(scheme_node * node, attr * to_delete_attr){
     if (node->first_attr != NULL && node->last_attr != NULL){
         // case has only one attribute
+        used_mem -= 1 + strlen(to_delete_attr->name_attr);
+        free(to_delete_attr->name_attr);
         if (node->first_attr == node->last_attr) {
-            free(node->first_attr);
-            used_mem -= sizeof(attr);
-            node->first_attr = NULL;
-            node->last_attr = NULL;
+            if (node->first_attr == to_delete_attr){
+                used_mem -= sizeof(attr);
+                free(node->first_attr);
+                node->first_attr = NULL;
+                node->last_attr = NULL;
+            }
         } else if (node->first_attr == to_delete_attr){
             attr * deleted = node ->first_attr;
             used_mem -= sizeof(attr);
@@ -479,7 +519,7 @@ void post_node_to_db(graph_db * db, scheme_node * node){
     }
 }
 
-void open_node_to_db(graph_db * db, scheme_node * node){
+int open_node_to_db(graph_db * db, scheme_node * node){
     unsigned char type;
     int dummy;
     int n;
@@ -496,6 +536,17 @@ void open_node_to_db(graph_db * db, scheme_node * node){
     db_fread(node->buffer, node->n_buffer, 1 , db);
     return 1;
 }
+
+int next_node(graph_db * db, scheme_node * node){
+    cancel_editing_node(node);
+    if (node->first_off_set == 0 || node->last_off_set == 0 || node->this_offset == 0)
+        return 0;
+    db_fseek(db, node->this_offset + sizeof(int) + sizeof(unsigned char), SEEK_SET);
+    node->prev_offset = node->this_offset;
+    db_fread(&node->this_offset, sizeof(int), 1 ,db);
+    return 1;
+}
+
 
 int link_current_node_to_current_node(graph_db * db, scheme_node * from_node, scheme_node * to_node){
     attr * list_attrs = from_node->first_attr;
@@ -522,14 +573,74 @@ int link_current_node_to_current_node(graph_db * db, scheme_node * from_node, sc
     }
     if (n < MAX_NODE_RELATIONS){
         (*buf)++;
-        buf[2*n+i] = to_node->root_off_set;
-        buf[2*n+i] = to_node->this_offset;
+        buf[2*n+1] = to_node->root_off_set;
+        buf[2*n+2] = to_node->this_offset;
         return 1;
     } else {
         return 0;
     }
 }
 
+float get_attr_value_of_node(scheme_node * node, char * attr_name){
+    int n;
+    if (node->n_buffer > 0 && search_attr_by_name(node, attr_name, &n)){
+        float * buf = (float *) node->buffer;
+        return buf[n];
+    }
+    return 0.0;
+}
+
+void restart_node_pointer(graph_db * db, scheme_node * node){
+    cancel_editing_node(node);
+    node->this_offset = node -> first_off_set;
+    node ->prev_offset = 0;
+}
+
+char * get_string_from_db (graph_db * db, int offset){
+    unsigned char type;
+    char * result;
+    int length;
+    int n;
+    db_fseek(db, offset, SEEK_SET);
+    db_fread(&n, sizeof(n), 1,  db);
+    db_fread(&type, sizeof(type), 1, db);
+    if (type != R_STRING) return NULL;
+    length = n - sizeof(int) - sizeof(unsigned char);
+    result = (char *) malloc(length);
+    used_mem += length;
+    db_fread(result, length, 1, db);
+    return result;
+
+}
+
+void init_db(char * file_name){
+    FILE * file = fopen(file_name, "rt");
+    if (file) {
+        char buf[512];
+        while (!feof(file)) {
+            if (fgets(buf, sizeof(buf), file) && strlen(buf) != 0 && strcmp(buf, "\n") != 0){
+                char * str = buf;
+                char * name = str;
+                while (*str != 0 && *str != '=' && *str != ' ') str++;
+                if (*str == 0){
+                    printf("Config: unrecognized line : %s\n", name);
+                } else {
+                    char * val = str + 1;
+                    int ival;
+                    *str = 0;
+                    while (*val != 0 && (*val == '=' || *val == ' ')) ++val;
+                    sscanf(val, "%i", &ival);
+                    if (strcmp(name, "BUFFER_SIZE") == 0) BUFFER_SIZE = ival;
+                    else if(strcmp(name, "MAX_NODE_RELATIONS") == 0) MAX_NODE_RELATIONS = ival;
+                    else {
+                        printf("Config: unrecognized var: %s\n", name);
+                    }
+                }
+            }
+        }
+        fclose(file);
+    }
+}
 void shutdown_db(graph_db * db){
     return;
 }

@@ -53,6 +53,7 @@ typedef struct {
 } graph_db;
 
 
+void init_db(char * file_name);
 db_scheme * create_new_scheme();
 
 graph_db * create_new_graph_db_by_scheme(db_scheme * scheme, char * file_name);
@@ -76,14 +77,18 @@ void free_node_from_scheme(scheme_node * node);
 void store_attrs(graph_db * db, attr * attributes);
 void store_relations(graph_db * db, node_relation * relations);
 
+
+void register_free(int amount);
+int next_node(graph_db * db, scheme_node * node);
 void cancel_editing_node(scheme_node * node);
 void create_node_for_db(graph_db * db, scheme_node * node);
 void post_node_to_db(graph_db * db, scheme_node * node);
-void open_node_to_db(graph_db * db, scheme_node * node);
+int open_node_to_db(graph_db * db, scheme_node * node);
+void restart_node_pointer(graph_db * db, scheme_node * node);
 int link_current_node_to_current_node(graph_db * db, scheme_node * from_node, scheme_node * to_node);
 
 void set_value_for_attr_of_node(graph_db * db, scheme_node * node, char * attr_name, float value);
-
-
+float get_attr_value_of_node(scheme_node * node, char * attr_name);
+char * get_string_from_db (graph_db * db, int offset);
 
 #endif
