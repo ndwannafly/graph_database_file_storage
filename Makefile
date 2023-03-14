@@ -1,17 +1,19 @@
-all: main
+all: test benchmark
 
-main: main.o graph_db.o data_helper.o
-	gcc build/main.o build/graph_db.o build/data_helper.o -o build/main
+test: test.o graph_db.o
+	gcc build/test.o build/graph_db.o -o build/test
 
-main.o: test/main.c
-	gcc -o build/main.o -c test/main.c
+benchmark: benchmark.o graph_db.o
+	gcc build/benchmark.o build/graph_db.o -o build/benchmark
+
+test.o: test/test.c
+	gcc -o build/test.o -c test/test.c
 
 graph_db.o: code/graph_db.c
 	gcc -o build/graph_db.o -c code/graph_db.c
 
-data_helper.o: code/data_helper.c
-	gcc -o build/data_helper.o -c code/data_helper.c
+benchmark.o: test/benchmark.c
+	gcc -o build/benchmark.o -c test/benchmark.c
 
 clean:
-	rm -rf build/*.o;\
-	rm build/main
+	rm -rf build/*
