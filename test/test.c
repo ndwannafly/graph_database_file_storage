@@ -4,8 +4,8 @@
 #include <string.h>
 
 int main(){
-    char * Titles[5] = {"Mist", "Prometeus", "Flew over the cookoo's nest", "Shawshank redemption", "AfterNoon"};
-    char * Families[10] = {"Stepanov", "Hamatova", "Churikova", "Pitt", "Delon", "Williams", "Nickolson", "Boyarskaya", "Freeman", "De Vito"};
+    char * country[5] = {"Russia", "Germany", "England", "Canada", "Spain"};
+    char * city[10] = {"Saint Petersburg", "Kaliningrad", "Berlin", "Frankfurt", "London", "Liverpool", "Toronto", "Vancouver", "Barcelona", "Majorca"};
 
     graph_db * db;
     db_scheme * scheme;
@@ -15,8 +15,8 @@ int main(){
     node_set_item * ns1;
     node_set_item * ns2;
     node_set_item * ns12;
-    scheme_node * movie_node;
-    scheme_node * actor_node;
+    scheme_node * country_node;
+    scheme_node * city_node;
     scheme_node * deleted_node;
 
     init_db("config.cfg");
@@ -24,70 +24,68 @@ int main(){
     scheme = create_new_scheme();
 
     // create CITY node
-    movie_node = add_node_to_scheme(scheme, "Movie");
-    add_attr_to_node(movie_node, "Title", AT_STRING);
-    add_attr_to_node(movie_node, "Year", AT_INT32);
+    country_node = add_node_to_scheme(scheme, "country");
+    add_attr_to_node(country_node, "name", AT_STRING);
+    add_attr_to_node(country_node, "population", AT_INT32);
 
     // create COUNTRY node
-    actor_node = add_node_to_scheme(scheme, "Actor");
-    add_attr_to_node(actor_node, "Family", AT_STRING);
-    add_attr_to_node(actor_node, "Name", AT_STRING);
-    add_attr_to_node(actor_node, "Oscar", AT_BOOLEAN);
-    add_attr_to_node(actor_node, "Year_of_birthday", AT_INT32);
-    add_attr_to_node(actor_node, "toDelete", AT_BOOLEAN);
+    city_node = add_node_to_scheme(scheme, "city");
+    add_attr_to_node(city_node, "area", AT_INT32);
+    add_attr_to_node(city_node, "name", AT_STRING);
+    add_attr_to_node(city_node, "to_delete", AT_BOOLEAN);
 
     // create DELETED node
-    deleted_node = add_node_to_scheme(scheme, "Deleted");
-    add_attr_to_node(deleted_node, "Signature", AT_INT32);
+    deleted_node = add_node_to_scheme(scheme, "deleted");
+    add_attr_to_node(deleted_node, "signature", AT_INT32);
 
     // ADD RELATION
-    add_node_relation(movie_node, deleted_node);
-    add_node_relation(movie_node, actor_node);
+    add_node_relation(country_node, deleted_node);
+    add_node_relation(country_node, city_node);
 
     // DELETE RELATION
-    del_node_relation(movie_node, deleted_node);
+    del_node_relation(country_node, deleted_node);
     // DELETE NODE
     del_node_from_scheme(scheme, deleted_node);
 
     // DELETE ATTR FROM NODE
     int i;
-    del_attr_from_node(actor_node, search_attr_by_name(actor_node, "toDelete", &i));
+    del_attr_from_node(city_node, search_attr_by_name(city_node, "to_delete", &i));
     db = create_new_graph_db_by_scheme(scheme, "storage.txt");
     for (i = 0; i < 10; i++){
         if (i%2 == 0){
-            create_node_for_db(db, movie_node);
-            set_value_for_attr_of_node(db, movie_node, "Title", create_string_for_db(db, Titles[i/2]));
-            set_value_for_attr_of_node(db, movie_node, "Year", 2000 + i);
-            post_node_to_db(db, movie_node);
+            create_node_for_db(db, country_node);
+            set_value_for_attr_of_node(db, country_node, "name", create_string_for_db(db, country[i/2]));
+            set_value_for_attr_of_node(db, country_node, "population", 1000000 + i*4000);
+            post_node_to_db(db, country_node);
         }
-        create_node_for_db(db, actor_node);
-        set_value_for_attr_of_node(db, actor_node, "Family", create_string_for_db(db, Families[i]));
-        set_value_for_attr_of_node(db, actor_node, "Year_of_birthday", 1980 + i);
-        post_node_to_db(db, actor_node);
-        open_node_to_db(db, movie_node);
-        if (!link_current_node_to_current_node(db, movie_node, actor_node)){
+        create_node_for_db(db, city_node);
+        set_value_for_attr_of_node(db, city_node, "name", create_string_for_db(db, city[i]));
+        set_value_for_attr_of_node(db, city_node, "area", 20000 + i * 100);
+        post_node_to_db(db, city_node);
+        open_node_to_db(db, country_node);
+        if (!link_current_node_to_current_node(db, country_node, city_node)){
             printf("Can't link!\n");
         }
-        post_node_to_db(db, movie_node);
+        post_node_to_db(db, country_node);
     }
-    restart_node_pointer(db, movie_node);
+    restart_node_pointer(db, country_node);
     i = 0;
-    while (open_node_to_db(db, movie_node)){
-        int year;
-        char * title;
-        year = get_attr_value_of_node(movie_node, "Year");
-        title = get_string_from_db(db, get_attr_value_of_node(movie_node, "Title"));
-        printf("%s [%i]\n", title, year);
-        register_free(1 + strlen(title));
-        free(title);
-        next_node(db, movie_node);
+    while (open_node_to_db(db, country_node)){
+        int population;
+        char * name;
+        population = get_attr_value_of_node(country_node, "population");
+        name = get_string_from_db(db, get_attr_value_of_node(country_node, "name"));
+        printf("%s [%i]\n", name, population);
+        register_free(1 + strlen(name));
+        free(name);
+        next_node(db, country_node);
         ++i;
     }
     printf("%d\n", get_used_mem());
-    printf("There is %i movies\n", i);
-    cond = create_int_or_bool_attr_condition(OP_LESS, "Year", 2004);
-    // Cypher-query: Match(j:movie) where j.YEAR < 2004 return j;
-    ns = query_all_nodes_of_type(db, movie_node, cond);
+    printf("There is %i countries\n", i);
+    cond = create_int_or_bool_attr_condition(OP_LESS, "population", 1010000);
+    // Cypher-query: Match(j:country) where j.population < 1010000 return j;
+    ns = query_all_nodes_of_type(db, country_node, cond);
     ns1 = ns;
     i = 0;
     while (ns1 != NULL) {
@@ -95,96 +93,96 @@ int main(){
         ++i;
     }
     free_node_set(db, ns);
-    printf("MATCH (j:Movie) WHERE j.Year < 2004 RETURN j;  =>  %i movies earlier 2004!\n", i);
+    printf("MATCH (j:country) WHERE j.population < 1010000 RETURN j;  =>  %i countries has population less than 1010000!\n", i);
 
     cond2 = create_logic_condition(
         OP_AND,
-        create_string_attr_condition(OP_NOT_EQUAL, "Family", "Pitt"),
-        create_string_attr_condition(OP_NOT_EQUAL, "Family", "Hamatova")
+        create_string_attr_condition(OP_NOT_EQUAL, "name", "Saint Petersburg"),
+        create_string_attr_condition(OP_NOT_EQUAL, "name", "Liverpool")
     );
-    // MATCH (j:Movie) - [:DIRECTED]->(a:Actor) Where (j.Year < 2004) AND (a.Family != "Pitt") AND (a.Family != "Hamatova") return a
-    ns2 = query_cypher_style(db, 2, movie_node, cond, actor_node, cond2);
+    // MATCH (j:country) - [:DIRECTED]->(a:city) Where (j.population < 1010000) AND (a.name != "Saint Petersburg") AND (a.name != "Liverpool") return a
+    ns2 = query_cypher_style(db, 2, country_node, cond, city_node, cond2);
     ns12 = ns2;
     i = 0;
-    printf("MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') RETURN a;  =>\n");
+    printf("MATCH (j:country)-[:DIRECTED]->(a:city) WHERE (j.population < 1010000) AND (a.name != 'Saint Petersburg') AND (a.name != 'Liverpool') RETURN a;  =>\n");
     while (ns12 != NULL){
         navigate_by_node_set_item(db, ns12);
-        if (open_node_to_db(db, actor_node)){
-            char * Family = get_string_from_db(db, get_attr_value_of_node(actor_node, "Family"));
-            printf("%s [%i]\n", Family, (int) get_attr_value_of_node(actor_node, "Year_of_birthday"));
-            register_free(strlen(Family)+1);
-            free(Family);
-            cancel_editing_node(actor_node);
+        if (open_node_to_db(db, city_node)){
+            char * name = get_string_from_db(db, get_attr_value_of_node(city_node, "name"));
+            printf("%s [%i]\n", name, (int) get_attr_value_of_node(city_node, "area"));
+            register_free(strlen(name)+1);
+            free(name);
+            cancel_editing_node(city_node);
         } else
-            printf("Can't open actor node!\n");
+            printf("Can't open city node!\n");
         ns12 = ns12->next;
         i++;
     }
     free_node_set(db, ns2);
-    printf("%i actors selected!\n", i);
+    printf("%i cities selected!\n", i);
     // return 0;
-    // MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') SET a.Year_of_birthday=1975 RETURN a;
-    printf("MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') SET a.Year_of_birthday=1975 RETURN a;\n");
-    set_cypher_style(db, "Year_of_birthday", 1975, 2, movie_node, cond, actor_node, cond2);
-    // MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') RETURN a;
-    printf("MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') RETURN a;  =>\n");
-    ns2 = query_cypher_style(db, 2, movie_node, cond, actor_node, cond2);
+    // MATCH (j:country)-[:DIRECTED]->(a:city) WHERE (j.population < 1010000) AND (a.name != "Saint Petersburg") AND (a.name != 'Liverpool') SET a.area=20100 RETURN a;
+    printf("MATCH (j:country)-[:DIRECTED]->(a:city) WHERE (j.population < 1010000) AND (a.name != 'Saint Petersburg') AND (a.name != 'Liverpool') SET a.area=20100 RETURN a;\n");
+    set_cypher_style(db, "area", 20100, 2, country_node, cond, city_node, cond2);
+    // MATCH (j:country)-[:DIRECTED]->(a:city) WHERE (j.population < 1010000) AND (a.name != "Saint Petersburg") AND (a.name != 'Liverpool') RETURN a;
+    printf("MATCH (j:country)-[:DIRECTED]->(a:city) WHERE (j.population < 1010000) AND (a.name != 'Saint Petersburg') AND (a.name != 'Liverpool') RETURN a;  =>\n");
+    ns2 = query_cypher_style(db, 2, country_node, cond, city_node, cond2);
     ns12 = ns2;
     i = 0;
     while (ns12 != NULL) {
         navigate_by_node_set_item(db, ns12);
-        if (open_node_to_db(db, actor_node)) {
-            char * Family = get_string_from_db(db, get_attr_value_of_node(actor_node, "Family"));
-            printf("%s [%i]\n", Family, (int)get_attr_value_of_node(actor_node, "Year_of_birthday"));
+        if (open_node_to_db(db, city_node)) {
+            char * Family = get_string_from_db(db, get_attr_value_of_node(city_node, "name"));
+            printf("%s [%i]\n", Family, (int)get_attr_value_of_node(city_node, "area"));
             register_free(strlen(Family)+1);
             free(Family);
-            cancel_editing_node(actor_node);
+            cancel_editing_node(city_node);
         } else
-            printf("Can't open actor node!\n");
+            printf("Can't open city node!\n");
         ns12 = ns12->next;
         i++;
     }
     free_node_set(db, ns2);
-    printf("%i actors selected!\n", i);
+    printf("%i cities selected!\n", i);
 
-    // MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') DELETE a;
-    printf("MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') DELETE a;  =>\n");
+    // MATCH (j:country)-[:DIRECTED]->(a:city) WHERE (j.population < 1010000) AND (a.name != "Saint Petersburg") AND (a.name != 'Liverpool') DELETE a;
+    printf("MATCH (j:country)-[:DIRECTED]->(a:city) WHERE (j.population < 1010000) AND (a.name != 'Saint Petersburg') AND (a.name != 'Liverpool') DELETE a;  =>\n");
 
-    delete_cypher_style(db, 2, movie_node, cond, actor_node, cond2);
-    printf("MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') RETURN a;  =>\n");
-    ns2 = query_cypher_style(db, 2, movie_node, cond, actor_node, cond2);
+    delete_cypher_style(db, 2, country_node, cond, city_node, cond2);
+    printf("MATCH (j:country)-[:DIRECTED]->(a:city) WHERE (j.population < 1010000) AND (a.name != 'Saint Petersburg') AND (a.name != 'Liverpool') RETURN a;  =>\n");
+    ns2 = query_cypher_style(db, 2, country_node, cond, city_node, cond2);
     ns12 = ns2;
     i = 0;
     while (ns12 != NULL) {
         navigate_by_node_set_item(db, ns12);
-        if (open_node_to_db(db, actor_node)) {
-            char * Family = get_string_from_db(db, get_attr_value_of_node(actor_node, "Family"));
-            printf("%s [%i]\n", Family, (int)get_attr_value_of_node(actor_node, "Year_of_birthday"));
+        if (open_node_to_db(db, city_node)) {
+            char * Family = get_string_from_db(db, get_attr_value_of_node(city_node, "name"));
+            printf("%s [%i]\n", Family, (int)get_attr_value_of_node(city_node, "area"));
             free(Family);
-            cancel_editing_node(actor_node);
+            cancel_editing_node(city_node);
         } else
-            printf("Can't open actor node!\n");
+            printf("Can't open city node!\n");
         ns12 = ns12->next;
         i++;
     }
     free_node_set(db, ns2);
-    printf("%i actors selected!\n", i);
+    printf("%i cities selected!\n", i);
 
-    restart_node_pointer(db, actor_node);
+    restart_node_pointer(db, city_node);
     i = 0;
-    while (open_node_to_db(db, actor_node)) {
-        next_node(db, actor_node);
+    while (open_node_to_db(db, city_node)) {
+        next_node(db, city_node);
         i++;
     }
-    printf("There is %i Actors\n", i);
+    printf("There is %i cities\n", i);
 
-    restart_node_pointer(db, actor_node);
+    restart_node_pointer(db, city_node);
     i = 0;
-    while (open_node_to_db(db, actor_node)) {
-        delete_node(db, actor_node);
+    while (open_node_to_db(db, city_node)) {
+        delete_node(db, city_node);
         i++;
     }
-    printf("There is %i Actors deleted\n", i);
+    printf("There is %i cities deleted\n", i);
 
     close_db(db);
 
