@@ -260,13 +260,14 @@ scheme_node * add_node_to_scheme(db_scheme * scheme, char * type_name){
 attr * search_attr_by_name(scheme_node * node, char * name, int * n){
     attr * current_attr = node->first_attr;
     *n = 0;
-    while(current_attr != NULL)
+    while(current_attr != NULL){
         if (strcmp(name, current_attr->name_attr) == 0)
             return current_attr;
         else {
             current_attr = current_attr->next;
             (*n)++;
         }
+    }
     *n -= 1;
     return NULL;
 }
@@ -968,7 +969,7 @@ void free_node_set(graph_db * db, node_set_item * node_set){
 void free_db_scheme_attr(attr * at){
     used_mem -= strlen(at->name_attr)+1;
     free(at->name_attr);
-    used_mem -= sizeof(attr*);
+    used_mem -= sizeof(attr);
     free(at);
 }
 void free_db_scheme_node(scheme_node * node){
@@ -976,6 +977,7 @@ void free_db_scheme_node(scheme_node * node){
     attr * at = node->first_attr;
     used_mem -= 1 + strlen(node->type);
     free(node->type);
+
     while (directed != NULL) {
         node_relation * to_delete = directed;
         directed = directed->next_node_relation;

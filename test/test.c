@@ -33,7 +33,7 @@ int main(){
     add_attr_to_node(actor_node, "Family", AT_STRING);
     add_attr_to_node(actor_node, "Name", AT_STRING);
     add_attr_to_node(actor_node, "Oscar", AT_BOOLEAN);
-    add_attr_to_node(actor_node, "Year_Of_birthday", AT_INT32);
+    add_attr_to_node(actor_node, "Year_of_birthday", AT_INT32);
     add_attr_to_node(actor_node, "toDelete", AT_BOOLEAN);
 
     // create DELETED node
@@ -122,6 +122,7 @@ int main(){
     }
     free_node_set(db, ns2);
     printf("%i actors selected!\n", i);
+    // return 0;
     // MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') SET a.Year_of_birthday=1975 RETURN a;
     printf("MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') SET a.Year_of_birthday=1975 RETURN a;\n");
     set_cypher_style(db, "Year_of_birthday", 1975, 2, movie_node, cond, actor_node, cond2);
@@ -186,6 +187,7 @@ int main(){
     printf("There is %i Actors deleted\n", i);
 
     close_db(db);
+
     free_condition(cond);
     free_condition(cond2);
 
